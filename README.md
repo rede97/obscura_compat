@@ -23,6 +23,9 @@ LD_PRELOAD=$PWD/shim.so LD_LIBRARY_PATH=$PWD ./patched/obscura --help
 | `libstdc++.so.6.0.28` | gcc9 运行时,提供 GLIBCXX_3.4.20 |
 | `patched/` | 打补丁后的 obscura / obscura-worker |
 
+> 注:`patched/`、`shim.so`、`libstdc++.so.6*` 为生成物,未纳入 git(见 `.gitignore`),
+> 按下文「复现补丁流程」可在数分钟内重建。
+
 ## 符号分析结论
 
 315 个未定义版本化符号中,>2.17 的 53 处引用分两类:
