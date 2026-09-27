@@ -52,8 +52,16 @@ jobs:
       - name: Build shim
         run: |
           set -euo pipefail
+          # 注意:现代 glibc (>=2.34) 的 -lpthread/-ldl/-lrt 链接脚本不再引用
+          # 兼容 .so.0,--no-as-needed 也不会产生 DT_NEEDED。必须直接链接
+          # 兼容库文件,才能把 libpthread/libdl/librt 拉进 C7 的全局符号域。
           gcc -shared -fPIC -O2 -o shim.so obscura_c7_shim.c \
-            -Wl,--no-as-needed -lpthread -ldl -lrt -Wl,--as-needed
+            -Wl,--no-as-needed \
+            /lib/x86_64-linux-gnu/libpthread.so.0 \
+            /lib/x86_64-linux-gnu/libdl.so.2 \
+            /lib/x86_64-linux-gnu/librt.so.1 \
+            -Wl,--as-needed
+          objdump -p shim.so | grep NEEDED
           # 防御性:新工具链可能引入 >2.17 的引用,一并剥离
           python3 strip_versions.py shim.so
           python3 rewrite_verneed.py shim.so
