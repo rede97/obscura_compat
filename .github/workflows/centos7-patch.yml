@@ -1,15 +1,14 @@
 name: centos7-patch
 
 # 触发方式:
-#  - schedule: 每 6 小时轮询上游最新 release,有新版才构建
+#  - schedule: 每周一轮询上游最新 release,有新版才构建
 #  - push:     修改 patcher / shim / 入口脚本 / 本 workflow 时重建当前版本
 #  - workflow_dispatch: 手动
 on:
   workflow_dispatch:
   schedule:
-    - cron: "23 */6 * * *"
+    - cron: "23 3 * * 1"   # 每周一 03:23 UTC
   push:
-    branches: [main]
     paths:
       - ".github/workflows/**"
       - "**.py"
