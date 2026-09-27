@@ -1,0 +1,15 @@
+#!/bin/sh
+# obscura CentOS 7 入口封装
+# 用法:解压 release 包后,可直接执行本脚本;或 ln -s 到 PATH 中的任意位置。
+#
+# ===== 用户可修改 =====
+# 安装位置。默认为本脚本所在目录(自动探测);
+# 若把脚本单独拷走或想写死路径,改成绝对路径即可,例如:
+#   OBSCURA_C7_HOME=/opt/obscura-c7
+OBSCURA_C7_HOME="${OBSCURA_C7_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+# ======================
+
+export LD_PRELOAD="$OBSCURA_C7_HOME/lib/shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
+export LD_LIBRARY_PATH="$OBSCURA_C7_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# 环境变量会被 obscura 派生的 obscura-worker 子进程自动继承。
+exec "$OBSCURA_C7_HOME/bin/obscura_c7" "$@"

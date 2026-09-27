@@ -1,0 +1,124 @@
+name: centos7-patch
+
+# 触发方式:
+#  - schedule: 每 6 小时轮询上游最新 release,有新版才构建
+#  - push:     修改 patcher / shim / 入口脚本 / 本 workflow 时重建当前版本
+#  - workflow_dispatch: 手动
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "**.py"
+      - "**.c"
+      - "obscura_c7"
+
+permissions:
+  contents: write
+
+concurrency: c7-patch
+
+env:
+  UPSTREAM: h4ckf0r0day/obscura
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.q.outputs.tag }}
+      changed: ${{ steps.q.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: q
+        run: |
+          set -euo pipefail
+          TAG=$(curl -sf "https://api.github.com/repos/${{ env.UPSTREAM }}/releases/latest" | jq -r .tag_name)
+          CUR=$(cat upstream-version 2>/dev/null || echo bootstrap)
+          echo "upstream=$TAG local=$CUR"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "changed=$([ "$TAG" = "$CUR" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+
+  patch:
+    needs: check
+    if: needs.check.outputs.changed == 'true' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build shim
+        run: |
+          set -euo pipefail
+          gcc -shared -fPIC -O2 -o shim.so obscura_c7_shim.c \
+            -Wl,--no-as-needed -lpthread -ldl -lrt -Wl,--as-needed
+          # 防御性:新工具链可能引入 >2.17 的引用,一并剥离
+          python3 strip_versions.py shim.so
+          python3 rewrite_verneed.py shim.so
+
+      - name: Grab validated libstdc++ 6.0.28 (gcc9 / Ubuntu 20.04)
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD":/out ubuntu:20.04 \
+            cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.28 /out/
+          python3 strip_versions.py libstdc++.so.6.0.28
+          python3 rewrite_verneed.py libstdc++.so.6.0.28
+
+      - name: Download and patch all x86_64-linux variants
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for suffix in "" "-stealth" "-no-render" "-no-render-stealth"; do
+            asset="obscura-x86_64-linux${suffix}.tar.gz"
+            out="obscura-c7-x86_64-linux${suffix}"
+            echo "== $asset"
+            curl -sfL "https://github.com/${{ env.UPSTREAM }}/releases/download/$TAG/$asset" -o pkg.tgz
+            rm -rf stage && mkdir -p stage/bin stage/lib
+            tar -xzf pkg.tgz -C stage/bin
+            python3 strip_versions.py stage/bin/obscura stage/bin/obscura-worker
+            python3 rewrite_verneed.py stage/bin/obscura stage/bin/obscura-worker
+            # 主二进制改 _c7 结尾;worker 保留原名(scrape 硬编码按名查找)
+            mv stage/bin/obscura stage/bin/obscura_c7
+            cp shim.so libstdc++.so.6.0.28 stage/lib/
+            ln -sf libstdc++.so.6.0.28 stage/lib/libstdc++.so.6
+            cp obscura_c7 stage/obscura_c7
+            tar -czf "dist/$out.tar.gz" --transform "s,^\.,$out," -C stage .
+          done
+          ls -la dist/
+
+      - name: Smoke test on real CentOS 7 userland
+        run: |
+          set -euo pipefail
+          rm -rf smoke && mkdir smoke
+          tar -xzf dist/obscura-c7-x86_64-linux-no-render-stealth.tar.gz -C smoke
+          docker run --rm -v "$PWD/smoke":/opt centos:7 sh -c '
+            set -e
+            /opt/*/obscura_c7 --version
+            /opt/*/obscura_c7 fetch https://example.com | grep -q "Example Domain"
+            /opt/*/obscura_c7 scrape https://example.com -e "document.title" --quiet | grep -q "Example Domain"
+            echo SMOKE-OK
+          '
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REL="c7-$TAG"
+          gh release delete "$REL" --yes 2>/dev/null || true
+          gh release create "$REL" dist/*.tar.gz \
+            --title "obscura $TAG — CentOS 7 patched" \
+            --notes "Automated patch of upstream release $TAG for CentOS 7 (glibc 2.17). See README for usage."
+
+      - name: Record upstream version
+        run: |
+          set -euo pipefail
+          echo "$TAG" > upstream-version
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add upstream-version
+          git commit -m "upstream release: $TAG" || true
+          git push

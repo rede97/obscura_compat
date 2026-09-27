@@ -6,12 +6,37 @@
 
 ## 使用
 
+从 [Releases](../../releases) 下载对应变体的 `obscura-c7-*.tar.gz`,解压后通过入口脚本调用:
+
 ```bash
-LD_PRELOAD=$PWD/shim.so LD_LIBRARY_PATH=$PWD ./patched/obscura --help
+tar xzf obscura-c7-x86_64-linux-no-render-stealth.tar.gz
+./obscura-c7-*/obscura_c7 fetch https://example.com
+
+# 可选:纳入 PATH
+ln -s "$PWD"/obscura-c7-*/obscura_c7 ~/.local/bin/obscura_c7
 ```
 
-`LD_LIBRARY_PATH` 用于加载捆绑的 `libstdc++.so.6.0.28`
-(二进制需要 `GLIBCXX_3.4.20`,C7 自带的 4.8.5 最高只有 `GLIBCXX_3.4.19`)。
+包结构:
+
+```
+obscura-c7-*/
+├── obscura_c7              # 入口脚本(顶部 OBSCURA_C7_HOME 变量可改为写死的安装路径)
+├── bin/
+│   ├── obscura_c7          # 打补丁的主二进制
+│   └── obscura-worker      # 打补丁的 worker(必须保留原名:scrape 硬编码按名查找)
+└── lib/
+    ├── shim.so             # glibc 2.17 缺失符号补齐
+    ├── libstdc++.so.6.0.28 # gcc9 运行时,提供 GLIBCXX_3.4.20
+    └── libstdc++.so.6 -> libstdc++.so.6.0.28
+```
+
+## CI 自动跟踪上游
+
+`.github/workflows/centos7-patch.yml` 每 6 小时轮询上游
+[h4ckf0r0day/obscura](https://github.com/h4ckf0r0day/obscura) 的最新 release:
+发现新版本即下载全部 4 个 x86_64-linux 变体 → 打补丁 → 在 centos:7 容器中
+冒烟测试(`--version` / `fetch` / `scrape`)→ 发布 `c7-<tag>` release,
+并把版本号记入 `upstream-version`。修改 patcher/shim 的 push 会立即重建当前版本。
 
 ## 组成
 
