@@ -14,6 +14,7 @@ on:
       - "**.py"
       - "**.c"
       - "obscura_c7"
+      - "install.sh"
 
 permissions:
   contents: write
@@ -91,7 +92,7 @@ jobs:
             mv stage/bin/obscura stage/bin/obscura_c7
             cp shim.so libstdc++.so.6.0.28 stage/lib/
             ln -sf libstdc++.so.6.0.28 stage/lib/libstdc++.so.6
-            cp obscura_c7 stage/obscura_c7
+            cp obscura_c7 install.sh README.md stage/
             tar -czf "dist/$out.tar.gz" --transform "s,^\.,$out," -C stage .
           done
           ls -la dist/
