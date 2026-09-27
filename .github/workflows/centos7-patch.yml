@@ -62,7 +62,7 @@ jobs:
       - name: Grab validated libstdc++ 6.0.28 (gcc9 / Ubuntu 20.04)
         run: |
           set -euo pipefail
-          docker run --rm -v "$PWD":/out ubuntu:20.04 \
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/out ubuntu:20.04 \
             cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.28 /out/
           python3 strip_versions.py libstdc++.so.6.0.28
           python3 rewrite_verneed.py libstdc++.so.6.0.28
