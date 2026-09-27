@@ -6,7 +6,8 @@
 # 安装位置。默认为本脚本所在目录(自动探测);
 # 若把脚本单独拷走或想写死路径,改成绝对路径即可,例如:
 #   OBSCURA_C7_HOME=/opt/obscura-c7
-OBSCURA_C7_HOME="${OBSCURA_C7_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+_self="$0"; while [ -L "$_self" ]; do _self=$(readlink -f "$_self"); done
+OBSCURA_C7_HOME="${OBSCURA_C7_HOME:-$(CDPATH= cd -- "$(dirname -- "$_self")" && pwd)}"
 # ======================
 
 export LD_PRELOAD="$OBSCURA_C7_HOME/lib/shim.so${LD_PRELOAD:+:$LD_PRELOAD}"
