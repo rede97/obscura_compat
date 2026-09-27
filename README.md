@@ -10,26 +10,29 @@
 `stealth` 增加 TLS 指纹伪装 + tracker 拦截;日常抓取推荐 `no-render-stealth`):
 
 ```bash
-# 1. 下载并解压到固定位置
-mkdir -p ~/.local/share
+# 1. 下载解压
 curl -LO https://github.com/rede97/obscura_compat/releases/latest/download/obscura-c7-x86_64-linux-no-render-stealth.tar.gz
-tar xzf obscura-c7-*.tar.gz -C ~/.local/share
-mv ~/.local/share/obscura-c7-* ~/.local/share/obscura-c7
+tar xzf obscura-c7-*.tar.gz && cd obscura-c7-*/
 
-# 2. 入口脚本链接进 PATH(脚本会 readlink -f 解析符号链接,无需改任何配置)
-mkdir -p ~/.local/bin
-ln -sf ~/.local/share/obscura-c7/obscura_c7 ~/.local/bin/obscura_c7
+# 2. 一键安装:复制到 ~/.local/share/obscura-c7,入口脚本链接进 ~/.local/bin
+./install.sh
+#    可用 OBSCURA_C7_PREFIX / OBSCURA_C7_BIN_DIR 覆盖安装位置
 
-# 3. 验证
+# 3. 若提示 ~/.local/bin 不在 PATH,按提示自行加入 shell 配置文件后重新登录
+
+# 4. 验证
 obscura_c7 --version
 obscura_c7 fetch https://example.com
 ```
+
 
 包结构与自定义:
 
 ```
 ~/.local/share/obscura-c7/
 ├── obscura_c7              # 入口脚本;顶部 OBSCURA_C7_HOME 变量可写死安装路径
+├── install.sh              # 一键安装到 ~/.local(见上)
+├── README.md               # 本文档
 ├── bin/
 │   ├── obscura_c7          # 打补丁的主二进制
 │   └── obscura-worker      # 打补丁的 worker(必须保留原名:scrape 硬编码按名查找)
